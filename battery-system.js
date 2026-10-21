@@ -2,6 +2,34 @@ class BatteryRackCard extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: "open" });
+        this._checkOffline = () => {
+            if (this.config && this.isOffline() !== this._renderedOffline) {
+                this.render();
+            }
+        };
+        this._onVisibilityChange = () => {
+            if (!document.hidden) this._checkOffline();
+        };
+    }
+
+    connectedCallback() {
+        this._offlineTimer = window.setInterval(this._checkOffline, 15_000);
+        document.addEventListener("visibilitychange", this._onVisibilityChange);
+        this._checkOffline();
+    }
+
+    disconnectedCallback() {
+        window.clearInterval(this._offlineTimer);
+        document.removeEventListener("visibilitychange", this._onVisibilityChange);
+    }
+
+    isOffline() {
+        if (this.config?.empty) return false;
+
+        const state = this._hass?.states[this.config?.last_active_entity]?.state;
+        const lastActive = Date.parse(state);
+
+        return !Number.isFinite(lastActive) || Date.now() - lastActive > 120_000;
     }
 
     setConfig(config) {
@@ -24,6 +52,7 @@ class BatteryRackCard extends HTMLElement {
             this.config?.voltage_entity,
             this.config?.current_entity,
             this.config?.delta_entity,
+            this.config?.last_active_entity,
             "input_text.test_battery_serial",
             "input_select.battery_test_phase",
         ].filter(Boolean);
@@ -34,7 +63,7 @@ class BatteryRackCard extends HTMLElement {
                 hass.states[entityId]?.state
         );
 
-        if (changed) {
+        if (changed || this.isOffline() !== this._renderedOffline) {
             this.render();
         }
     }
@@ -147,6 +176,7 @@ class BatteryRackCard extends HTMLElement {
         if (!this.config) return;
 
         const config = this.config;
+        this._renderedOffline = this.isOffline();
         const selectedSerial =
             this._hass?.states["input_text.test_battery_serial"]?.state;
 
@@ -205,7 +235,7 @@ class BatteryRackCard extends HTMLElement {
         // ASSIGNED BUT NOT DISCOVERED
         // ----------------------------------------------------------
 
-        if (config.offline) {
+        if (this._renderedOffline) {
             this.shadowRoot.innerHTML = `
         <style>
           ha-card {
@@ -672,30 +702,6 @@ class BatterySystemDashboardStrategy extends HTMLElement {
             return Number.isFinite(value) ? value : null;
         };
 
-        const isBatteryOffline = (battery) => {
-            if (!battery.last_active_entity) {
-                return true;
-            }
-
-            const state = hass.states[battery.last_active_entity]?.state;
-
-            if (
-                !state ||
-                state === "unknown" ||
-                state === "unavailable"
-            ) {
-                return true;
-            }
-
-            const lastActive = Date.parse(state);
-
-            if (Number.isNaN(lastActive)) {
-                return true;
-            }
-
-            return Date.now() - lastActive > 120_000;
-        };
-
         // ------------------------------------------------------------
         // Discover Daly batteries from their serial-number sensors.
         // ------------------------------------------------------------
@@ -869,7 +875,7 @@ class BatterySystemDashboardStrategy extends HTMLElement {
 
                         serial: battery.serial,
                         device_id: battery.device_id,
-                        offline: isBatteryOffline(battery),
+                        last_active_entity: battery.last_active_entity,
 
                         battery_id: battery.id,
                         board_number: battery.board_number,
@@ -898,6 +904,7 @@ class BatterySystemDashboardStrategy extends HTMLElement {
             device_id: battery.device_id,
 
             battery_id: battery.id,
+            last_active_entity: battery.last_active_entity,
             board_number: battery.board_number,
 
             soc_entity: battery.soc_entity,
