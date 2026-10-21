@@ -38,9 +38,9 @@ function setup() {
 test('an initially offline card recovers when only its heartbeat changes', () => {
     const { card, hass } = setup();
     card.hass = hass('unavailable');
-    assert.match(card.shadowRoot.innerHTML, /NOT FOUND/);
+    assert.match(card.shadowRoot.innerHTML, /OFFLINE/);
     card.hass = hass('2026-10-20T12:00:00Z');
-    assert.doesNotMatch(card.shadowRoot.innerHTML, /NOT FOUND/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /OFFLINE/);
 });
 
 test('idle cards expire and recover after background-tab resume', () => {
@@ -50,12 +50,12 @@ test('idle cards expire and recover after background-tab resume', () => {
     advance(120_001);
     context.document.hidden = false;
     listeners.get('visibilitychange')();
-    assert.match(card.shadowRoot.innerHTML, /NOT FOUND/);
+    assert.match(card.shadowRoot.innerHTML, /OFFLINE/);
     card.hass = hass('2026-10-20T12:02:00Z');
-    assert.doesNotMatch(card.shadowRoot.innerHTML, /NOT FOUND/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /OFFLINE/);
     advance(120_000);
     for (const callback of timers.values()) callback();
-    assert.match(card.shadowRoot.innerHTML, /NOT FOUND/);
+    assert.match(card.shadowRoot.innerHTML, /OFFLINE/);
     card.disconnectedCallback();
     assert.equal(timers.size, 0);
     assert.equal(listeners.size, 0);
@@ -68,9 +68,9 @@ test('missing and invalid heartbeats stay offline; empty slots stay empty', () =
     const { card, hass } = setup();
     for (const state of [undefined, 'unknown', 'unavailable', 'invalid']) {
         card.hass = hass(state);
-        assert.match(card.shadowRoot.innerHTML, /NOT FOUND/);
+        assert.match(card.shadowRoot.innerHTML, /OFFLINE/);
     }
     card.setConfig({ empty: true, position: 'C1' });
     assert.match(card.shadowRoot.innerHTML, /EMPTY/);
-    assert.doesNotMatch(card.shadowRoot.innerHTML, /NOT FOUND/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /OFFLINE/);
 });

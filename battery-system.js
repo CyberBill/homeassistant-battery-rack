@@ -232,12 +232,26 @@ class BatteryRackCard extends HTMLElement {
         }
 
         // ----------------------------------------------------------
-        // ASSIGNED BUT NOT DISCOVERED
+        // OFFLINE BATTERY
         // ----------------------------------------------------------
 
         if (this._renderedOffline) {
             this.shadowRoot.innerHTML = `
         <style>
+          a {
+            color: inherit;
+            text-decoration: none;
+            display: block;
+          }
+
+          a ha-card {
+            cursor: pointer;
+          }
+
+          a:hover ha-card {
+            background-color: var(--secondary-background-color);
+          }
+
           ha-card {
             height: 120px;
             box-sizing: border-box;
@@ -269,11 +283,13 @@ class BatteryRackCard extends HTMLElement {
           }
         </style>
 
+        ${config.device_id ? `<a href="/config/devices/device/${config.device_id}">` : ""}
         <ha-card>
           <div class="header">${config.position}</div>
-          <div class="offline">NOT FOUND</div>
+          <div class="offline">OFFLINE</div>
           <div class="serial">${config.serial}</div>
         </ha-card>
+        ${config.device_id ? "</a>" : ""}
       `;
 
             return;
@@ -793,17 +809,12 @@ class BatterySystemDashboardStrategy extends HTMLElement {
                 battery.serial !== "UNKNOWN" &&
                 battery.serial !== "UNAVAILABLE");
 
-        // Calculate all the batteries as unidentified, identified, positioned, unassigned
+        // Group batteries as unidentified, positioned, or unassigned.
         // "Unidentified" means the battery has no valid ID.
         const unidentified = batteries.filter(
             (battery) => battery.id == null
         );
         
-        // "Identified" means the battery has a valid ID.
-        const identifiedBatteries = batteries.filter(
-            (battery) => battery.id != null
-        );
-
         // "Positioned" means the battery has a valid ID and is assigned to a valid cabinet, row, and depth.
         const positionedBatteries = batteries.filter(
             (battery) =>
@@ -917,6 +928,20 @@ class BatterySystemDashboardStrategy extends HTMLElement {
         // Build dashboard.
         // ------------------------------------------------------------
 
+        const summary = [`**${positionedBatteries.length}** Installed`];
+
+        if (unassigned.length > 0 || unidentified.length > 0) {
+            summary.push(`**${batteries.length}** discovered`);
+        }
+
+        if (unassigned.length > 0) {
+            summary.push(`**${unassigned.length}** unassigned`);
+        }
+
+        if (unidentified.length > 0) {
+            summary.push(`**${unidentified.length}** unidentified`);
+        }
+
         return {
             title: "Battery System",
 
@@ -931,11 +956,7 @@ class BatterySystemDashboardStrategy extends HTMLElement {
 
                     cards: [{
                         type: "markdown",
-                        content: `# Battery Rack\n\n` +
-                            `**${batteries.length}** discovered · ` +
-                            `**${identifiedBatteries.length}** identified · ` +
-                            `**${positionedBatteries.length}** installed · ` +
-                            `**${unassigned.length}** unassigned`,
+                        content: `# Battery Rack\n\n` + summary.join(" · "),
                     },
 
                     {
@@ -943,7 +964,7 @@ class BatterySystemDashboardStrategy extends HTMLElement {
                         cards: rackCards,
                     },
 
-                    {
+                    ...(unassignedCards.length > 0 ? [{
                         type: "markdown",
                         content:
                             `## Unassigned Batteries\n\n` +
@@ -955,7 +976,7 @@ class BatterySystemDashboardStrategy extends HTMLElement {
                         columns: 6,
                         square: false,
                         cards: unassignedCards,
-                    },
+                    }] : []),
                     ],
                 },],
             },],
