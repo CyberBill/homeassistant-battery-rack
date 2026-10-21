@@ -209,11 +209,6 @@ class BatteryRackCard extends HTMLElement {
             text-align: center;
           }
 
-          .position {
-            font-size: 12px;
-            font-weight: 600;
-          }
-
           .empty {
             margin-top: 6px;
             font-size: 11px;
@@ -223,7 +218,6 @@ class BatteryRackCard extends HTMLElement {
 
         <ha-card>
           <div>
-            <div class="position">${config.position}</div>
             <div class="empty">EMPTY</div>
           </div>
         </ha-card>
@@ -285,7 +279,7 @@ class BatteryRackCard extends HTMLElement {
 
         ${config.device_id ? `<a href="/config/devices/device/${config.device_id}">` : ""}
         <ha-card>
-          <div class="header">${config.position}</div>
+          <div class="header">${config.battery_id != null ? `#${config.battery_id}` : "#?"}</div>
           <div class="offline">OFFLINE</div>
           <div class="serial">${config.serial}</div>
         </ha-card>
@@ -320,6 +314,11 @@ class BatteryRackCard extends HTMLElement {
 
         this.shadowRoot.innerHTML = `
       <style>
+        :host {
+          display: block;
+          min-width: 0;
+        }
+
         a {
           color: inherit;
           text-decoration: none;
@@ -327,7 +326,7 @@ class BatteryRackCard extends HTMLElement {
         }
 
         ha-card {
-          height: 120px;
+          min-height: 120px;
           box-sizing: border-box;
           padding: 9px 10px;
 
@@ -357,7 +356,7 @@ class BatteryRackCard extends HTMLElement {
 
         .header {
           display: flex;
-          justify-content: space-between;
+          justify-content: flex-end;
           align-items: baseline;
 
           font-size: 11px;
@@ -371,6 +370,7 @@ class BatteryRackCard extends HTMLElement {
 
         .main {
           display: flex;
+          flex-wrap: wrap;
           align-items: baseline;
           justify-content: center;
           gap: 8px;
@@ -389,6 +389,8 @@ class BatteryRackCard extends HTMLElement {
 
         .details {
           display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
           justify-content: space-between;
 
           font-size: 11px;
@@ -410,9 +412,43 @@ class BatteryRackCard extends HTMLElement {
         }
 
         .test-button {
-            --mdc-icon-button-size: 28px;
-            --mdc-icon-size: 18px;
-            margin: -6px -5px -6px 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .test-button ha-icon {
+            --mdc-icon-size: 20px;
+            pointer-events: none;
+        }
+
+        .test-button:focus-visible {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        @media (pointer: coarse), (max-width: 900px) {
+            .test-button {
+                width: 44px;
+                height: 44px;
+            }
+
+            ha-card {
+                min-height: 148px;
+            }
+
+            .serial {
+                font-size: 10px;
+            }
         }
 
         .test-button:hover {
@@ -472,19 +508,20 @@ class BatteryRackCard extends HTMLElement {
         <ha-card class="${selectedForTest ? "test-selected" : ""}">
 
           <div class="header">
-            <span>${config.position}</span>
-
             <div class="header-right">
               <span class="board">
                 ${config.battery_id != null ? `#${config.battery_id}` : "#?"}
               </span>
 
               <div class="test-button-wrapper">
-                    <ha-icon-button
+                    <button
+                        type="button"
+                        aria-label="Select battery ${config.battery_id ?? config.serial} for testing"
+                        aria-disabled="${testLocked}"
                         class="test-button ${testLocked ? "test-button-disabled" : ""}"
                     >
                         <ha-icon icon="mdi:flask"></ha-icon>
-                    </ha-icon-button>
+                    </button>
 
                     <div class="test-tooltip">
                         ${
@@ -576,6 +613,7 @@ class BatteryCabinetRack extends HTMLElement {
                 :host {
                     display: block;
                     width: 100%;
+                    container-type: inline-size;
                 }
 
                 .rack {
@@ -597,6 +635,7 @@ class BatteryCabinetRack extends HTMLElement {
 
                 .cabinet {
                     display: grid;
+                    min-width: 0;
                     grid-template-columns:
                         minmax(0, 1fr)
                         minmax(0, 1fr);
@@ -605,7 +644,7 @@ class BatteryCabinetRack extends HTMLElement {
                 }
 
                 .divider {
-                    background: #000;
+                    background: var(--primary-text-color, #000);
                     width: 3px;
 
                     /*
@@ -613,6 +652,14 @@ class BatteryCabinetRack extends HTMLElement {
                      * divider and the cards on either side.
                      */
                     margin: 0 auto;
+                }
+
+                .cabinet-title {
+                    display: none;
+                    grid-column: 1 / -1;
+                    margin: 0;
+                    font-size: 14px;
+                    font-weight: 600;
                 }
 
                 /*
@@ -626,6 +673,29 @@ class BatteryCabinetRack extends HTMLElement {
                 .cabinet:not(:last-child) {
                     padding-right: 8px;
                 }
+
+                /* Keep front/rear pairs readable on phones and smaller screens. */
+                @container (max-width: 1400px) {
+                    .rack {
+                        grid-template-columns: minmax(0, 1fr);
+                        gap: 16px;
+                    }
+
+                    .divider {
+                        width: 100%;
+                        height: 2px;
+                    }
+
+                    .cabinet-title {
+                        display: block;
+                    }
+
+                    .cabinet:not(:first-child),
+                    .cabinet:not(:last-child) {
+                        padding: 0;
+                    }
+                }
+
             </style>
 
             <div class="rack"></div>
@@ -645,6 +715,11 @@ class BatteryCabinetRack extends HTMLElement {
         for (let cabinet = 0; cabinet < 5; cabinet++) {
             const cabinetElement = document.createElement("div");
             cabinetElement.className = "cabinet";
+
+            const heading = document.createElement("h2");
+            heading.className = "cabinet-title";
+            heading.textContent = `Cabinet ${cabinet + 1}`;
+            cabinetElement.appendChild(heading);
 
             for (let row = 0; row < 3; row++) {
                 for (let depth = 0; depth < 2; depth++) {
